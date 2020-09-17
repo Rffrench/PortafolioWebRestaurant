@@ -48,7 +48,18 @@ exports.getReservation = (req, res, next) => {
 exports.postReservation = (req, res, next) => {
     const [reservationDate, reservationTime, party, userId] = [req.body.reservationDate, req.body.reservationTime, req.body.party, req.body.userId];
 
-    sequelize.query('CALL addReservation(:p_reservationDate, :p_reservationTime, :p_party, :p_userId)', { replacements: { p_reservationDate: reservationDate, p_reservationTime: reservationTime, p_party: party, p_userId: userId } })
+    // Primero se verifica que no exista una reserva activa 
+    sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
+        .then(rows => {
+            if (rows.length > 0) {
+                const error = new Error('Ya existe una reserva actualmente');
+                error.statusCode = 204;
+                throw error;
+            }
+
+
+            return sequelize.query('CALL addReservation(:p_reservationDate, :p_reservationTime, :p_party, :p_userId)', { replacements: { p_reservationDate: reservationDate, p_reservationTime: reservationTime, p_party: party, p_userId: userId } })
+        })
         .then(result => {
             res.status(201).json({ result: 'Reserva Insertada' });
         })
@@ -56,6 +67,7 @@ exports.postReservation = (req, res, next) => {
             if (!err.statusCode) {
                 err.statusCode = 500;
             }
+
             next(err);
         })
 }
