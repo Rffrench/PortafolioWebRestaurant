@@ -45,6 +45,7 @@ exports.getReservation = (req, res, next) => {
 
 }
 
+// MYSQL TIMEZONE MUST BE UPDATED!!!!!
 exports.postReservation = (req, res, next) => {
     const [reservationDate, reservationTime, party, userId] = [req.body.reservationDate, req.body.reservationTime, req.body.party, req.body.userId];
 
@@ -53,7 +54,7 @@ exports.postReservation = (req, res, next) => {
         .then(rows => {
             if (rows.length > 0) {
                 const error = new Error('Ya existe una reserva actualmente');
-                error.statusCode = 204;
+                error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
                 throw error;
             }
 
@@ -67,11 +68,11 @@ exports.postReservation = (req, res, next) => {
             if (!err.statusCode) {
                 err.statusCode = 500;
             }
-
             next(err);
         })
 }
 
+// MYSQL TIMEZONE MUST BE UPDATED!!!!!
 exports.deleteReservation = (req, res, next) => {
     const userId = req.params.userId;
 
