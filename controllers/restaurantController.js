@@ -55,6 +55,7 @@ exports.postReservation = (req, res, next) => {
             if (rows.length > 0) {
                 const error = new Error('Ya existe una reserva actualmente');
                 error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
+                error.statusMessage = 'Ya existe una reserva actualmente'
                 throw error;
             }
 
