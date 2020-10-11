@@ -1,8 +1,13 @@
 // Controlador Restaurante
 
 const sequelize = require('../util/database');
+const fs = require('fs');
+const archiver = require('archiver');
 const Reservation = require('../models/reservationsModel'); // must be imported or it wont work
-
+const MenuCategories = require('../models/menuCategoriesModel');
+const MenuItems = require('../models/menuItemsModel');
+const MenuImages = require('../models/menuImagesModel');
+const MenuItemsMenuImages = require('../models/menuItemsMenuImagesModel');
 
 // Reservas
 exports.getReservations = (req, res, next) => {
@@ -91,7 +96,7 @@ exports.deleteReservation = (req, res, next) => {
         })
         .then(result => {
             console.log(result);
-            res.status(201).json({ resultado: 'Reserva Eliminada' });
+            res.status(204).json({ resultado: 'Reserva Eliminada' });
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -102,6 +107,241 @@ exports.deleteReservation = (req, res, next) => {
 }
 
 
+
+
+
+
+
+
+// Menu
+exports.getMenuItems = (req, res, next) => {
+    sequelize.query('CALL getMenuItems()')
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Menu Items Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json({ menu: rows });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+// Mandando zip de imagenes
+exports.getMenuItemsImages = (req, res, next) => {
+    sequelize.query('CALL getMenuItemsImages()')
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Menu Item Image Found');
+                error.statusCode = 404;
+                throw error;
+            }
+
+            // Se setean los headers para enviar el zip
+            res.set({
+                'Content-Type': 'application/zip',
+                'Content-Disposition': 'attachment; filename="menuItemsImages.zip"'
+            })
+
+            // Creando archivo .zip para las imagenes del menu
+            const output = fs.createWriteStream('menuItemsImages.zip', { flags: 'w' });
+            const archive = archiver('zip', {
+                zlib: { level: 9 } // Sets the compression level.
+            })
+
+            output.on('end', function () {
+                console.log('Data has been drained');
+
+            });
+
+            archive.on('error', function (err) {
+                throw err;
+            });
+
+            // listen for all archive data to be written. 'close' event is fired only when a file descriptor is involved
+            output.on('close', function () {
+                console.log(archive.pointer() + ' total bytes');
+                console.log('archiver has been finalized and the output file descriptor has closed.');
+
+
+                res.status(200).sendFile('menuItemsImages.zip', { root: '.' }); // se manda la rspsta cuando finaliza el proceso de compresion
+            });
+
+            archive.pipe(output);
+
+            rows.forEach((row, index) => {
+                archive.append(fs.createReadStream(row.imagePath), { name: row.imagePath }); // se agrega cada imagen
+                //stream.write(`${row.imagePath}\n`);
+            })
+
+            // finalize the archive (ie we are done appending files but streams have to finish yet)
+            // 'close', 'end' or 'finish' may be fired right after calling this method so register to them beforehand
+            archive.finalize(); // esto llama a los otros handlers como 'close'
+
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+
+exports.getMenuItem = (req, res, next) => {
+    const menuItemId = req.params.menuItemId;
+    sequelize.query('CALL getMenuItem(:p_id)', { replacements: { p_id: menuItemId } })
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Menu Item Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json(rows);
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+// se obtiene aparte la img ya que como JSON no se puede
+exports.getMenuItemImage = (req, res, next) => {
+    const menuItemId = req.params.menuItemId;
+    sequelize.query('CALL getMenuItemImage(:p_menuItemId)', { replacements: { p_menuItemId: menuItemId } })
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Menu Item Image Found');
+                error.statusCode = 404;
+                throw error;
+            }
+
+            console.log(rows[0].imagePath);
+
+            res.status(200).sendFile(rows[0].imagePath, { root: '.' }); // se manda la foto como archivo
+
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+// Middleware para subir la imagen por separado!! No se puede mandar por JSON asique se sube separada como multipart/form-data y se guarda en una tabla el path. La imagen se guardar en el servidor por temas de performance y lo que se guarda es la ruta
+// Multer adds a body object and a file or files object to the request object. The body object contains the values of the text fields of the form, the file or files object contains the files uploaded via the form.
+exports.postMenuItemImage = (req, res, next) => {
+    const image = req.file; // no es req.body!! req.file pq es un archivo que adjunta multer, multer se encarga de lo otro
+    console.log(req.file);
+
+
+    MenuImages.findOne({ where: { imagePath: image.path } })
+        .then(rows => {
+            if (rows) {
+                const error = new Error('Ya existe una imagen con ese nombre');
+                error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
+                error.statusMessage = 'Ya existe una imagen con ese nombre'
+                throw error;
+            }
+
+            return MenuImages.create({ imagePath: image.path })
+
+        })
+        .then(newRow => {
+
+            res.status(201).json(newRow.toJSON()); // Se devuelve info de la fila insertada, mas RESTful
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+// La imagen se sube por separada porque no se puede por JSON. EL id de la img se pasa luego a este POST
+exports.postMenuItem = (req, res, next) => {
+    const [itemName, description, price, isAvailable, categoryId, imageId] = [req.body.name, req.body.description, req.body.price, req.body.isAvailable, req.body.categoryId, req.body.imageId];
+
+
+    // Primero se verifica que no exista el item
+    MenuItems.findOne({ where: { name: itemName } }) // usando sequelize aca
+        .then(rows => {
+            if (rows) {
+                const error = new Error('Ya existe un item con ese nombre');
+                error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
+                error.statusMessage = 'Ya existe un item con ese nombre'
+                throw error;
+            }
+
+            // START TRANSACTION y COMMIT van en el SP, en caso de error se hace rollback a todo
+            return sequelize.query('CALL addMenuItem(:p_name, :p_description, :p_price, :p_isAvailable, :p_categoryId, :p_menuImageId)', { replacements: { p_name: itemName, p_description: description, p_price: price, p_isAvailable: isAvailable, p_categoryId: categoryId, p_menuImageId: imageId } })
+        })
+        .then(newRow => {
+            res.status(201).json({ result: 'Insertado' }); // TODO: cambiar a que me devuelva el item
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+exports.deleteMenuItem = (req, res, next) => {
+    const menuItemId = req.params.menuItemId;
+    let imagePath;
+
+    sequelize.query('CALL getMenuItem(:p_id)', { replacements: { p_id: menuItemId } })
+        .then(row => {
+            if (row.length === 0) {
+                const error = new Error('Item no encontrado');
+                error.statusCode = 404;
+                throw error;
+            }
+
+            // se va a buscar la foto para sacar el path
+            return sequelize.query('CALL getMenuItemImage(:p_menuItemId)', { replacements: { p_menuItemId: menuItemId } })
+        })
+        .then(row => {
+            if (row.length === 0) {
+                const error = new Error('No Menu Item Image Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            imagePath = row[0].imagePath; // se guarda el path de la foto para borrarla
+
+            // se elimina el path de la img y la img del server
+            return sequelize.query('CALL deleteMenuItem(:p_id)', { replacements: { p_id: menuItemId } })
+        })
+        .then(result => {
+            fs.unlink(imagePath, (err) => { // borrando del fs la img
+                if (err) {
+                    throw err;
+                }
+                console.log("Imagen Eliminada.");
+            });
+
+
+            res.status(204).json({ resultado: 'Item Eliminado' });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
 
 
 
