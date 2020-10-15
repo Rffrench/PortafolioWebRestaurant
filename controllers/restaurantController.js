@@ -38,7 +38,7 @@ exports.getReservation = (req, res, next) => {
                 error.statusCode = 404;
                 throw error;
             }
-            console.log(rows);
+            console.log(JSON.stringify(rows));
             res.status(200).json({ reservations: rows });
         })
         .catch(err => {
@@ -176,7 +176,9 @@ exports.getMenuItemsImages = (req, res, next) => {
             archive.pipe(output);
 
             rows.forEach((row, index) => {
-                archive.append(fs.createReadStream(row.imagePath), { name: row.imagePath }); // se agrega cada imagen
+                console.log(row);
+                archive.append(fs.createReadStream(row.imagePath), { name: row.menuImageId + '-' + row.imagePath.split('/')[1] }); // Images names are added with the id prepend to then in the fornt identify and link each one with the JSON data. Also the image path is split because otherwise a folder would be created each time with the string 'images'
+
                 //stream.write(`${row.imagePath}\n`);
             })
 
@@ -225,7 +227,7 @@ exports.getMenuItemImage = (req, res, next) => {
                 throw error;
             }
 
-            console.log(rows[0].imagePath);
+            console.log(rows[0]);
 
             res.status(200).sendFile(rows[0].imagePath, { root: '.' }); // se manda la foto como archivo
 
