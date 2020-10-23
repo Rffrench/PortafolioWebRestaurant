@@ -8,6 +8,11 @@ const MenuCategories = require('../models/menuCategoriesModel');
 const MenuItems = require('../models/menuItemsModel');
 const MenuImages = require('../models/menuImagesModel');
 const MenuItemsMenuImages = require('../models/menuItemsMenuImagesModel');
+const Orders = require('../models/OrdersModel');
+const OrderStatus = require('../models/OrderStatusModel');
+const OrderDetails = require('../models/OrderDetailsModel');
+const OrderPayments = require('../models/OrderPaymentsModel');
+const PaymentTypes = require('../models/PaymentTypesModel');
 
 // Reservas
 exports.getReservations = (req, res, next) => {
@@ -345,6 +350,120 @@ exports.deleteMenuItem = (req, res, next) => {
         })
 }
 
+
+
+
+
+
+
+
+// Orders
+exports.getOrders = (req, res, next) => {
+    Orders.findAll()
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Orders Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json(rows.toJSON());
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+exports.getOrder = (req, res, next) => {
+    const userId = req.params.userId; // se obtiene el ID de la URL dinamica /products/:userId
+    Orders.findOne({ where: { customerId: userId } })
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Orders Found');
+                error.statusCode = 404;
+                throw error;
+            }
+
+            res.status(200).json(rows.toJSON());
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+
+}
+
+
+exports.postOrder = (req, res, next) => {
+    const userId = req.body.userId;
+    const order = req.body.order;
+
+    console.log(order);
+    console.log(userId);
+
+
+    res.send('hey')
+    return;
+    // Primero se verifica que no exista una reserva activa 
+    Orders.findOne({ where: { customerId: userId, statusId: 1 } })
+        .then(rows => {
+            if (rows.length > 0) {
+                const error = new Error('Ya existe una order en progreso');
+                error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
+                error.statusMessage = 'Ya existe una orden en progreso'
+                throw error;
+            }
+
+
+            return Orders.create({ customerId: userId, statusId: 1 });
+        })
+        .then(result => {
+            res.status(201).json({ result: 'Reserva Insertada' });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+exports.putOrder = (req, res, next) => {
+    const userId = req.params.userId;
+}
+
+
+exports.deleteOrder = (req, res, next) => {
+    const userId = req.params.userId;
+
+
+    sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
+        .then(row => {
+            if (row.length === 0) {
+                const error = new Error('Reserva no encontrada');
+                error.statusCode = 404;
+                throw error;
+            }
+
+
+            return sequelize.query('CALL cancelReservation(:p_id)', { replacements: { p_id: row[0].id } })
+        })
+        .then(result => {
+            console.log(result);
+            res.status(204).json({ resultado: 'Reserva Eliminada' });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
 
 
 

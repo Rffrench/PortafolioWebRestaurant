@@ -22,4 +22,12 @@ router.get('/menu/images/:menuItemId', restaurantController.getMenuItemImage); /
 router.get('/menu/:menuItemId', restaurantController.getMenuItem);
 router.delete('/menu/:menuItemId', restaurantController.deleteMenuItem);
 
+
+// Orders
+router.get('/orders', restaurantController.getOrders);
+router.post('/orders', restaurantController.postOrder);
+router.get('/orders/:userId', restaurantController.getOrder);
+router.put('/orders/:userId', restaurantController.putOrder);
+router.delete('/orders/:orderId', restaurantController.deleteOrder);
+
 module.exports = router;

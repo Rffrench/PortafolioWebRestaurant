@@ -38,6 +38,10 @@ app.use(multer({ storage: fileStorage, fileFilter: fileFilter }).single('image')
 // Routes
 const restaurantRoutes = require('./routes/restaurantRoutes');
 
+// Models
+const Orders = require('./models/OrdersModel');
+const OrderStatus = require('./models/OrderStatusModel');
+
 // Setting the routes
 app.use(restaurantRoutes);
 
@@ -45,6 +49,9 @@ app.use(restaurantRoutes);
 app.get('/', (req, res, next) => {
     res.send('Hey from restaurant service');
 })
+
+// Sequelize tables associations
+Orders.belongsTo(OrderStatus, { as: 'status' });
 
 sequelize.sync()
     .then(result => {
