@@ -1,6 +1,7 @@
 // Controlador Restaurante
 
 const sequelize = require('../util/database');
+const Op = require('sequelize').Op; // sequelize operators
 const fs = require('fs');
 const archiver = require('archiver');
 const Reservation = require('../models/reservationsModel'); // must be imported or it wont work
@@ -404,15 +405,11 @@ exports.postOrder = (req, res, next) => {
     const order = req.body.order;
 
     console.log(order);
-    console.log(userId);
 
-
-    res.send('hey')
-    return;
-    // Primero se verifica que no exista una reserva activa 
-    Orders.findOne({ where: { customerId: userId, statusId: 1 } })
+    // Primero se verifica que no exista una orden activa 
+    Orders.findOne({ where: { customerId: userId, statusId: { [Op.ne]: 3 } } })
         .then(rows => {
-            if (rows.length > 0) {
+            if (rows) {
                 const error = new Error('Ya existe una order en progreso');
                 error.statusCode = 409; // If i set a 204 or 3xx then it would not work and the server would return a 500. CAREFUL!!! Only 4xx codes apparently work
                 error.statusMessage = 'Ya existe una orden en progreso'
@@ -420,10 +417,24 @@ exports.postOrder = (req, res, next) => {
             }
 
 
-            return Orders.create({ customerId: userId, statusId: 1 });
+            return Orders.create({ customerId: userId, statusId: 1 }); // first order is created
         })
-        .then(result => {
-            res.status(201).json({ result: 'Reserva Insertada' });
+        .then(newOrder => {
+            //now details are inserted (prods and qty)
+
+            let orderInserts = []; // an array of sequelize create promises is created
+            order.forEach(item => {
+                if (item[1] > 0) { // if the qty is 0 this is not added
+                    orderInserts.push(OrderDetails.create({ menuItemId: item[0], orderId: newOrder.id, quantity: item[1] }))
+                }
+            });
+
+            return [Promise.all(orderInserts), newOrder]; // This array of promises is executed and the new order info is returned
+
+            //newOrder.addMenuItems(MenuItems, { through: { quantity: 2 } })
+        })
+        .then(([orderInserts, newOrder]) => {
+            res.status(201).json(newOrder.toJSON()); // New order info is sent
         })
         .catch(err => {
             if (!err.statusCode) {

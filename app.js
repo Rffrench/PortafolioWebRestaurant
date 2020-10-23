@@ -40,7 +40,9 @@ const restaurantRoutes = require('./routes/restaurantRoutes');
 
 // Models
 const Orders = require('./models/OrdersModel');
+const MenuItems = require('./models/menuItemsModel');
 const OrderStatus = require('./models/OrderStatusModel');
+const OrderDetails = require('./models/OrderDetailsModel');
 
 // Setting the routes
 app.use(restaurantRoutes);
@@ -50,8 +52,12 @@ app.get('/', (req, res, next) => {
     res.send('Hey from restaurant service');
 })
 
-// Sequelize tables associations
+// Sequelize tables associations (they do not really matter now because i manually created the tables)
 Orders.belongsTo(OrderStatus, { as: 'status' });
+MenuItems.belongsToMany(Orders, { through: OrderDetails, foreignKey: 'menuItemId' });
+Orders.belongsToMany(MenuItems, { through: OrderDetails, foreignKey: 'orderId' });
+
+
 
 sequelize.sync()
     .then(result => {
