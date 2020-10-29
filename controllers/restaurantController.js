@@ -406,7 +406,19 @@ exports.postOrder = (req, res, next) => {
 
     console.log(order);
 
-    // Primero se verifica que no exista una orden activa 
+
+    // Checking if order is empty. It firsts checks if it is null, then it checks if all the items (every()) have qty less or equal 0. If one returns false then it continues to the sequelize part
+    if (!order || order.every((item) => {
+        return item[1] <= 0; // if its false it means there is at least 1 item with qty > 0
+    })) {
+        const error = new Error('Orden vacía');
+        error.statusCode = 422;
+        error.statusMessage = 'Orden Vacía';
+        throw error;
+    }
+
+
+    // Primero se verifica que no exista una orden activa i.e que el statusId !=3
     Orders.findOne({ where: { customerId: userId, statusId: { [Op.ne]: 3 } } })
         .then(rows => {
             if (rows) {

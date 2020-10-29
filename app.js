@@ -17,7 +17,9 @@ const fileStorage = multer.diskStorage({
         cb(null, 'images');
     },
     filename: (req, file, cb) => {
-        cb(null, new Date().toISOString() + '-' + file.originalname);
+        let name = new Date().toISOString() + '-' + file.originalname;
+        name = name.replace(/:/g, '') // se remueven los : pa q en windows no haya problemas 
+        cb(null, name);
     }
 })
 // multer image filter
