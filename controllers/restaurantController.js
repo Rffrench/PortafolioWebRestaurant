@@ -35,6 +35,25 @@ exports.getReservations = (req, res, next) => {
         })
 }
 
+exports.getTodayReservations = (req, res, next) => {
+    sequelize.query('CALL getTodayReservations()')
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Reservations Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json({ reservations: rows });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
 exports.getReservation = (req, res, next) => {
     const userId = req.params.userId; // se obtiene el ID de la URL dinamica /products/:userId
     sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
