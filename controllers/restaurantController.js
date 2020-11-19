@@ -368,7 +368,7 @@ exports.getOrders = (req, res, next) => {
                 throw error;
             }
             console.log(rows);
-            res.status(200).json(rows.toJSON());
+            res.status(200).json(rows);
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -378,17 +378,26 @@ exports.getOrders = (req, res, next) => {
         })
 }
 
-exports.getOrder = (req, res, next) => {
+exports.getOrder = (req, res, next) => { // getting the active order
     const userId = req.params.userId; // se obtiene el ID de la URL dinamica /products/:userId
-    Orders.findOne({ where: { customerId: userId } })
+    Orders.findOne({
+        include: [{ // Sequelize will require the joined table so it will return the items info too
+            model: MenuItems,
+            attributes: ['id', 'price'], // its redundant so only some fields are specified
+            through: {
+                attributes: ['quantity'] // orderId is not specified and the item is above
+            }
+        }],
+        where: { customerId: userId, statusId: 1 }
+    })
         .then(rows => {
-            if (rows.length === 0) {
+            if (!rows) {
                 const error = new Error('No Orders Found');
                 error.statusCode = 404;
                 throw error;
             }
 
-            res.status(200).json(rows.toJSON());
+            res.status(200).json(rows);
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -456,8 +465,81 @@ exports.postOrder = (req, res, next) => {
         })
 }
 
-exports.putOrder = (req, res, next) => {
+exports.putOrderExtra = (req, res, next) => {
     const userId = req.params.userId;
+    const order = req.body.order;
+
+    // TODO: Verify negative quantities
+    console.log(order);
+
+    // Checking if order is empty. It firsts checks if it is null, then it checks if all the items (every()) have qty less or equal 0. If one returns false then it continues to the sequelize part
+    if (!order || order.every((item) => {
+        return item[1] <= 0; // if its false it means there is at least 1 item with qty > 0. item[0] is the id item[1] the qty
+    })) {
+        const error = new Error('No hay extras agregados');
+        error.statusCode = 422;
+        error.statusMessage = 'No hay extras agregados';
+        throw error;
+    }
+
+    // we get the order info including the joined table with the items and qty cuz upsert() didnt work with sequelize.literal() and we need the previous values of each item
+    Orders.findOne({
+        include: [{
+            model: MenuItems,
+            attributes: ['id', 'price'],
+            through: {
+                attributes: ['quantity']
+            }
+        }],
+        where: { customerId: userId, statusId: 1 }
+    })
+        .then(currentOrder => {
+            if (!currentOrder) {
+                const error = new Error('No existe una orden en progreso');
+                error.statusCode = 404;
+                error.statusMessage = 'No existe una orden en progreso'
+                throw error;
+            }
+
+            let orderItems = []; // an array of sequelize FIND promises is created
+
+            // we iterate the new items array
+            order.forEach(item => {
+                if (item[1] > 0) { // if the qty is 0 this is not added
+
+                    let itemId = parseInt(item[0]); // values come as string
+                    let newItemQty = parseInt(item[1]);
+                    let prevItemQty = 0;
+                    let prevItem;
+
+                    // we now search the previous qty values of the items to then update them. If the item is not found the qty is set to 0
+                    prevItem = currentOrder.MenuItems.find(item => item.id == itemId);
+                    prevItemQty = prevItem ? parseInt(prevItem.OrderDetails.quantity) : 0;
+
+
+                    // updating the qty or inserting new row 
+                    orderItems.push(
+                        OrderDetails.upsert(
+                            {
+                                menuItemId: itemId,
+                                orderId: currentOrder.id,
+                                quantity: prevItemQty + newItemQty
+                            }
+                        ))
+                }
+            });
+
+            return Promise.all(orderItems); // returns an array of items it found
+        })
+        .then((orderItems) => {
+            res.status(201).json({ result: 'success' }); // New order info is sent
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
 }
 
 
