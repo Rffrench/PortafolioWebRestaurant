@@ -7,6 +7,7 @@ const restaurantController = require('../controllers/restaurantController');
 
 // CRD Reservations
 router.get('/reservations', restaurantController.getReservations);
+router.get('/reservations/today', restaurantController.getTodayReservations);
 router.post('/reservations', restaurantController.postReservation);
 router.get('/reservations/:userId', restaurantController.getReservation);
 router.delete('/reservations/:userId', restaurantController.deleteReservation);
