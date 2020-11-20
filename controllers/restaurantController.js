@@ -657,16 +657,27 @@ exports.deleteOrder = (req, res, next) => {
 }
 
 exports.requestPayment = (req, res, next) => {
+
     const orderId = req.params.orderId;
-    sequelize.query('CALL RequestPayment(:p_order)', { replacements: { p_order: orderId } })
-        .then(rows => {
-            if (rows.length === 0) {
+    Orders.update({ statusId: "2" }, {
+        where: {
+          statusId: "1",
+          id: orderId
+        }
+      })
+      .then(result =>
+        {
+            if(result[0] == 0)
+            {
                 const error = new Error('No order found');
                 error.statusCode = 404;
                 throw error;
             }
-            console.log("Updated Order: Client ready to pay");
-            res.status(200).json(rows);
+            else{
+                console.log("Updated Order: Order requires payment");
+                res.status(200).json(result);
+            }
+            
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -674,19 +685,30 @@ exports.requestPayment = (req, res, next) => {
             }
             next(err);
         })
+
 }
 
 exports.closeCustomerOrder = (req, res, next) => {
+
     const orderId = req.params.orderId;
-    sequelize.query('CALL CloseCustomerOrder(:p_order)', { replacements: { p_order: orderId } })
-        .then(rows => {
-            if (rows.length === 0) {
+    Orders.update({ statusId: "3" }, {
+        where: {
+          id: orderId
+        }
+      })
+      .then(result =>
+        {
+            if(result[0] == 0)
+            {
                 const error = new Error('No order found');
                 error.statusCode = 404;
                 throw error;
             }
-            console.log("Updated Order: Order closed");
-            res.status(200).json(rows);
+            else{
+                console.log("Updated Order: Order Closed");
+                res.status(200).json(result);
+            }
+            
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -694,6 +716,7 @@ exports.closeCustomerOrder = (req, res, next) => {
             }
             next(err);
         })
+
 }
 
 
