@@ -658,7 +658,7 @@ exports.deleteOrder = (req, res, next) => {
 
 exports.requestPayment = (req, res, next) => {
     const orderId = req.params.orderId;
-    sequelize.query('CALL RequestPayment(:p_id)', { replacements: { p_order: orderId } })
+    sequelize.query('CALL RequestPayment(:p_order)', { replacements: { p_order: orderId } })
         .then(rows => {
             if (rows.length === 0) {
                 const error = new Error('No order found');
@@ -678,7 +678,7 @@ exports.requestPayment = (req, res, next) => {
 
 exports.closeCustomerOrder = (req, res, next) => {
     const orderId = req.params.orderId;
-    sequelize.query('CALL CloseCustomerOrder(:p_id)', { replacements: { p_order: orderId } })
+    sequelize.query('CALL CloseCustomerOrder(:p_order)', { replacements: { p_order: orderId } })
         .then(rows => {
             if (rows.length === 0) {
                 const error = new Error('No order found');
