@@ -1,9 +1,12 @@
 // Controlador Restaurante
-
 const sequelize = require('../util/database');
 const Op = require('sequelize').Op; // sequelize operators
 const fs = require('fs');
 const archiver = require('archiver');
+const sgMail = require('@sendgrid/mail');
+
+sgMail.setApiKey(process.env.SENDGRID_API_KEY); // setting the sendGrid email api key
+
 const Reservation = require('../models/reservationsModel'); // must be imported or it wont work
 const MenuCategories = require('../models/menuCategoriesModel');
 const MenuItems = require('../models/menuItemsModel');
@@ -14,6 +17,9 @@ const OrderStatus = require('../models/OrderStatusModel');
 const OrderDetails = require('../models/OrderDetailsModel');
 const OrderPayments = require('../models/OrderPaymentsModel');
 const PaymentTypes = require('../models/PaymentTypesModel');
+
+
+
 
 // Reservas
 exports.getReservations = (req, res, next) => {
@@ -77,7 +83,27 @@ exports.getReservation = (req, res, next) => {
 
 // MYSQL TIMEZONE MUST BE UPDATED!!!!!
 exports.postReservation = (req, res, next) => {
-    const [reservationDate, reservationTime, party, userId] = [req.body.reservationDate, req.body.reservationTime, req.body.party, req.body.userId];
+    const [reservationDate, reservationTime, party, userId, email] = [req.body.reservationDate, req.body.reservationTime, req.body.party, req.body.userId, req.body.email];
+
+
+    // Email message
+    const msg = {
+        to: email,
+        from: 'portafolio_caso3@hotmail.com', // Use the email address or domain you verified above
+        subject: 'Reserva Creada',
+        text: 'Reserva Creada',
+        html: `
+        <html>
+            <body style="border: 1px solid black; padding: 10px;">
+                <h1>Reserva creada</h1>
+                <br>
+                <h3>Su reserva ha sido creada con éxito. ¡Te esperamos!</h3>
+                <br>
+                <p><i>Restaurante Siglo XXI</i></p>
+            </body>
+        </html>
+        `,
+    };
 
     // Primero se verifica que no exista una reserva activa 
     sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
@@ -93,6 +119,18 @@ exports.postReservation = (req, res, next) => {
             return sequelize.query('CALL addReservation(:p_reservationDate, :p_reservationTime, :p_party, :p_userId)', { replacements: { p_reservationDate: reservationDate, p_reservationTime: reservationTime, p_party: party, p_userId: userId } })
         })
         .then(result => {
+            // sending the email
+            (async () => {
+                try {
+                    await sgMail.send(msg);
+                } catch (error) {
+                    console.error(error);
+
+                    if (error.response) {
+                        console.error(error.response.body)
+                    }
+                }
+            })();
             res.status(201).json({ result: 'Reserva Insertada' });
         })
         .catch(err => {
@@ -106,7 +144,25 @@ exports.postReservation = (req, res, next) => {
 // MYSQL TIMEZONE MUST BE UPDATED!!!!!
 exports.deleteReservation = (req, res, next) => {
     const userId = req.params.userId;
+    const email = req.query.email;
 
+    const msg = {
+        to: email,
+        from: 'portafolio_caso3@hotmail.com', // Use the email address or domain you verified above
+        subject: 'Reserva Cancelada',
+        text: 'Reserva Cancelada',
+        html: `
+        <html>
+            <body style="border: 1px solid black; padding: 10px;">
+                <h1>Reserva Cancelada</h1>
+                <br>
+                <h3>Su reserva ha sido cancelada.</h3>
+                <br>
+                <p><i>Restaurante Siglo XXI</i></p>
+            </body>
+        </html>
+        `,
+    };
 
     sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
         .then(row => {
@@ -120,7 +176,18 @@ exports.deleteReservation = (req, res, next) => {
             return sequelize.query('CALL cancelReservation(:p_id)', { replacements: { p_id: row[0].id } })
         })
         .then(result => {
-            console.log(result);
+            // sending the email
+            (async () => {
+                try {
+                    await sgMail.send(msg);
+                } catch (error) {
+                    console.error(error);
+
+                    if (error.response) {
+                        console.error(error.response.body)
+                    }
+                }
+            })();
             res.status(204).json({ resultado: 'Reserva Eliminada' });
         })
         .catch(err => {
