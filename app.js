@@ -63,9 +63,9 @@ Orders.belongsToMany(MenuItems, { through: OrderDetails, foreignKey: 'orderId' }
 
 sequelize.sync()
     .then(result => {
-        //console.log(result);
+        console.log(result);
         app.listen(PORT);
-        console.log("Listening on port: "+PORT)
+        console.log("Listening on port: " + PORT)
     })
     .catch(err => {
         console.log(err);

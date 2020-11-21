@@ -474,7 +474,7 @@ exports.getOrder = (req, res, next) => { // getting the active order
                 attributes: ['quantity'] // orderId is not specified and the item is above
             }
         }],
-        where: { customerId: userId, statusId: 1 }
+        where: { customerId: userId, statusId: { [Op.ne]: 3 } }
     })
         .then(rows => {
             if (!rows) {
@@ -577,7 +577,7 @@ exports.putOrderExtra = (req, res, next) => {
                 attributes: ['quantity']
             }
         }],
-        where: { customerId: userId, statusId: 1 }
+        where: { customerId: userId, statusId: { [Op.ne]: 3 } }
     })
         .then(currentOrder => {
             if (!currentOrder) {
@@ -586,6 +586,13 @@ exports.putOrderExtra = (req, res, next) => {
                 error.statusMessage = 'No existe una orden en progreso'
                 throw error;
             }
+            if (currentOrder.statusId === 2) {
+                const error = new Error('Pago solicitado. No se puede pedir extra.');
+                error.statusCode = 409;
+                error.statusMessage = 'Pago solicitado. No se puede pedir extra.'
+                throw error;
+            }
+
 
             let orderItems = []; // an array of sequelize FIND promises is created
 
@@ -661,23 +668,21 @@ exports.requestPayment = (req, res, next) => {
     const orderId = req.params.orderId;
     Orders.update({ statusId: "2" }, {
         where: {
-          statusId: "1",
-          id: orderId
+            statusId: "1",
+            id: orderId
         }
-      })
-      .then(result =>
-        {
-            if(result[0] == 0)
-            {
+    })
+        .then(result => {
+            if (result[0] == 0) {
                 const error = new Error('No order found');
                 error.statusCode = 404;
                 throw error;
             }
-            else{
+            else {
                 console.log("Updated Order: Order requires payment");
                 res.status(200).json(result);
             }
-            
+
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -693,22 +698,20 @@ exports.closeCustomerOrder = (req, res, next) => {
     const orderId = req.params.orderId;
     Orders.update({ statusId: "3" }, {
         where: {
-          id: orderId
+            id: orderId
         }
-      })
-      .then(result =>
-        {
-            if(result[0] == 0)
-            {
+    })
+        .then(result => {
+            if (result[0] == 0) {
                 const error = new Error('No order found');
                 error.statusCode = 404;
                 throw error;
             }
-            else{
+            else {
                 console.log("Updated Order: Order Closed");
                 res.status(200).json(result);
             }
-            
+
         })
         .catch(err => {
             if (!err.statusCode) {
