@@ -656,5 +656,68 @@ exports.deleteOrder = (req, res, next) => {
         })
 }
 
+exports.requestPayment = (req, res, next) => {
+
+    const orderId = req.params.orderId;
+    Orders.update({ statusId: "2" }, {
+        where: {
+          statusId: "1",
+          id: orderId
+        }
+      })
+      .then(result =>
+        {
+            if(result[0] == 0)
+            {
+                const error = new Error('No order found');
+                error.statusCode = 404;
+                throw error;
+            }
+            else{
+                console.log("Updated Order: Order requires payment");
+                res.status(200).json(result);
+            }
+            
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+
+}
+
+exports.closeCustomerOrder = (req, res, next) => {
+
+    const orderId = req.params.orderId;
+    Orders.update({ statusId: "3" }, {
+        where: {
+          id: orderId
+        }
+      })
+      .then(result =>
+        {
+            if(result[0] == 0)
+            {
+                const error = new Error('No order found');
+                error.statusCode = 404;
+                throw error;
+            }
+            else{
+                console.log("Updated Order: Order Closed");
+                res.status(200).json(result);
+            }
+            
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+
+}
+
 
 

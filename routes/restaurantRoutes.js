@@ -30,5 +30,6 @@ router.post('/orders', restaurantController.postOrder);
 router.get('/orders/:userId', restaurantController.getOrder);
 router.put('/orders/:userId', restaurantController.putOrderExtra);
 router.delete('/orders/:orderId', restaurantController.deleteOrder);
-
+router.get('/orders/close/:orderId', restaurantController.closeCustomerOrder);
+router.get('/orders/pay/:orderId', restaurantController.requestPayment);
 module.exports = router;
