@@ -17,8 +17,7 @@ const OrderStatus = require('../models/OrderStatusModel');
 const OrderDetails = require('../models/OrderDetailsModel');
 const OrderPayments = require('../models/OrderPaymentsModel');
 const PaymentTypes = require('../models/PaymentTypesModel');
-
-
+const Tables = require('../models/TablesModel')
 
 
 // Reservas
@@ -447,6 +446,52 @@ exports.deleteMenuItem = (req, res, next) => {
 // Orders
 exports.getOrders = (req, res, next) => {
     Orders.findAll()
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Orders Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json(rows);
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+exports.getKitchenOrders = (req, res, next) => {
+    sequelize.query('CALL getKitchenOrders()')
+        .then(rows => {
+            if (rows.length === 0) {
+                const error = new Error('No Orders Found');
+                error.statusCode = 404;
+                throw error;
+            }
+            console.log(rows);
+            res.status(200).json({ orders: rows });
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+
+exports.getRequestedDishes = (req, res, next) => {
+    OrderDetails.hasOne(MenuItems,{foreignKey:"id"})
+    OrderDetails.findAll({
+        where: {orderId:req.params.orderId},
+        include: [{
+            model:MenuItems,
+            required:true
+        }]
+    })
         .then(rows => {
             if (rows.length === 0) {
                 const error = new Error('No Orders Found');
