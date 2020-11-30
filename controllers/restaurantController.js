@@ -484,12 +484,12 @@ exports.getKitchenOrders = (req, res, next) => {
 
 
 exports.getRequestedDishes = (req, res, next) => {
-    OrderDetails.hasOne(MenuItems,{foreignKey:"id"})
+    OrderDetails.hasOne(MenuItems, { foreignKey: "id" })
     OrderDetails.findAll({
-        where: {orderId:req.params.orderId},
+        where: { orderId: req.params.orderId },
         include: [{
-            model:MenuItems,
-            required:true
+            model: MenuItems,
+            required: true
         }]
     })
         .then(rows => {
@@ -596,7 +596,7 @@ exports.postOrder = (req, res, next) => {
         })
 }
 
-exports.putOrderExtra = (req, res, next) => {
+exports.putOrderExtra = (req, res, next) => { // TODO: should be PATCH!!
     const userId = req.params.userId;
     const order = req.body.order;
 
@@ -685,20 +685,32 @@ exports.deleteOrder = (req, res, next) => {
     const userId = req.params.userId;
 
 
-    sequelize.query('CALL getReservation(:p_userId)', { replacements: { p_userId: userId } })
-        .then(row => {
-            if (row.length === 0) {
-                const error = new Error('Reserva no encontrada');
+    // TODO:
+}
+
+// updating a single field of an ACTIVE order. We use PATCH for this and send attributes in the body
+exports.patchOrder = (req, res, next) => {
+    // PATCH /orders/:userId { "statusId": "xxx" } --> return 406 if the val is not accepted
+
+    const userId = req.params.userId;
+    const attributes = req.body;
+
+    Orders.findOne(
+        {
+            where: { customerId: userId, statusId: { [Op.ne]: 3 } } // paid orders cannot be modified
+        })
+        .then(currentOrder => {
+            if (!currentOrder) {
+                const error = new Error('No existe una orden en progreso');
                 error.statusCode = 404;
+                error.statusMessage = 'No existe una orden en progreso'
                 throw error;
             }
 
-
-            return sequelize.query('CALL cancelReservation(:p_id)', { replacements: { p_id: row[0].id } })
+            return currentOrder.update(attributes); // we update the order fields that are specidfied in the body
         })
-        .then(result => {
-            console.log(result);
-            res.status(204).json({ resultado: 'Reserva Eliminada' });
+        .then(updatedOrder => {
+            res.status(201).json(updatedOrder);
         })
         .catch(err => {
             if (!err.statusCode) {
@@ -707,6 +719,134 @@ exports.deleteOrder = (req, res, next) => {
             next(err);
         })
 }
+
+
+
+
+
+
+// PAYMENTS
+
+exports.postPayment = (req, res, next) => {
+    const userId = req.params.userId;
+    const email = req.body.email;
+    const paymentType = req.body.paymentType;
+    const tip = req.body.tip;
+    let orderId;
+    let total = 0; // calculated from the order info
+
+
+    // Email message
+    const msg = {
+        to: email,
+        from: 'portafolio_caso3@hotmail.com', // Use the email address or domain you verified above
+        subject: 'Orden pagada',
+        text: 'Orden Pagada',
+        html: `
+        <html>
+            <body style="border: 1px solid black; padding: 10px;">
+                <h1>Orden Pagada</h1>
+                <br>
+                <h3>Has pagado tu orden. ¡Gracias por venir!</h3>
+                <br>
+                <p><i>Restaurante Siglo XXI</i></p>
+            </body>
+        </html>
+        `,
+    };
+
+
+    Orders.findOne({
+        include: [{
+            model: MenuItems,
+            attributes: ['id', 'price'],
+            through: {
+                attributes: ['quantity']
+            }
+        }],
+        where: { customerId: userId, statusId: { [Op.ne]: 3 } }
+    })
+        .then(currentOrder => {
+            if (!currentOrder) {
+                const error = new Error('No existe una orden en progreso');
+                error.statusCode = 404;
+                error.statusMessage = 'No existe una orden en progreso'
+                throw error;
+            }
+            orderId = currentOrder.id;
+
+
+            // Calculando el total
+            currentOrder.MenuItems.forEach(item => {
+                total = total + item.price * item.OrderDetails.quantity;
+            })
+
+            console.log(total + tip);
+
+
+
+
+            return OrderPayments.findOne({ where: { orderId: orderId } }); // searching for an existing payment
+        })
+        .then(payment => {
+            if (payment) { // if a payment is found with the orderId then the order has already been paid
+                const error = new Error('Ya se pagó la orden');
+                error.statusCode = 409;
+                error.statusMessage = 'Ya se pagó la orden';
+                throw error;
+            }
+
+
+            return OrderPayments.create({ total: total, discount: 0, tip: tip, orderId: orderId, paymentTypeId: paymentType })
+        })
+        .then(newPayment => {
+            // if webpay was the payment type we send the email straight away. Conversely, if cash is it then finance sends it
+            if (paymentType === 2) {
+                // sending the email
+                (async () => {
+                    try {
+                        await sgMail.send(msg);
+                    } catch (error) {
+                        console.error(error);
+
+                        if (error.response) {
+                            console.error(error.response.body)
+                        }
+                    }
+                })();
+            }
+            res.status(201).json(newPayment);
+        })
+        .catch(err => {
+            if (!err.statusCode) {
+                err.statusCode = 500;
+            }
+            next(err);
+        })
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 exports.requestPayment = (req, res, next) => {
 

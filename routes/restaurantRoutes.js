@@ -29,9 +29,26 @@ router.get('/orders', restaurantController.getOrders);
 router.post('/orders', restaurantController.postOrder);
 router.get('/orders/:userId', restaurantController.getOrder);
 router.put('/orders/:userId', restaurantController.putOrderExtra);
+router.patch('/orders/:userId', restaurantController.patchOrder)
 router.delete('/orders/:orderId', restaurantController.deleteOrder);
-router.get('/orders/close/:orderId', restaurantController.closeCustomerOrder);
-router.get('/orders/pay/:orderId', restaurantController.requestPayment);
+
+// Payments
+router.post('/orders/:userId/payments', restaurantController.postPayment);
+
+
+
+// Kitchen
 router.get('/kitchenorders', restaurantController.getKitchenOrders);
 router.get('/requesteddishes/:orderId', restaurantController.getRequestedDishes);
+
+
+
+
+
+
+
+router.get('/orders/close/:orderId', restaurantController.closeCustomerOrder);
+router.get('/orders/pay/:orderId', restaurantController.requestPayment);
+
+
 module.exports = router;
